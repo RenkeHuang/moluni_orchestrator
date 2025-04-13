@@ -1,17 +1,16 @@
 # High-throughput computational materials workflow
 
 This repository contains a end-to-end workflow for automating high-throughput materials discovery calculations 
-using NVIDIA's ALCHEMI API. 
-The workflow takes SMILES strings as input, processes them using RDKit and ASE, 
-sets up geometry optimization calculations that are optimized with NVIDIA WARP, 
-submits calculations to the ALCHEMI NIM API, 
-and stores results in a DuckDB database.
+using [NVIDIA ALCHEMI API](https://developer.nvidia.com/blog/revolutionizing-ai-driven-material-discovery-using-nvidia-alchemi/). 
+The workflow takes SMILES strings as input, processes them using [RDKit](https://github.com/rdkit/rdkit) and [ASE](https://wiki.fysik.dtu.dk/ase/), 
+runs GPU-accelerated geometry optimizations via ALCHEMI NIM API, 
+and stores results to database.
 
 
 ## Components
 1. Input Processing and Calculation Submission System
    - Takes SMILES strings as input and converts them to 3D structures using RDKit
-   - Uses NVIDIA WARP for GPU-accelerated geometry optimization
+   - Leverages [NVIDIA Warp](https://nvidia.github.io/warp/index.html) for GPU-accelerated geometry optimization
    - Submits batches of calculations to the NIM API
 
 2. Job Monitoring and Results Processing Pipeline
@@ -30,7 +29,7 @@ and stores results in a DuckDB database.
 
 - Python 3.8+
 - NVIDIA API Key for Alchemi services
-- RDKit, ASE, NVIDIA WARP, DuckDB -->
+- RDKit, ASE, NVIDIA Warp, DuckDB -->
 
 ## Project Structure
 
@@ -45,7 +44,7 @@ moluni_orchestrator/
 │   ├── postprocess.py      # Utils to check job status, process results
 │   └── workflow.py         # Preprocessing and prepare workflow
 ├── README.md
-├── results              results
+├── results              
 └── workflow
     ├── analyze_db.py
     ├── check_results.sh         # Bash script to check for results locally
@@ -149,9 +148,9 @@ for formula, smiles, band_gap in results:
     print(f"{formula} ({smiles}): {band_gap} eV")
 ```
 
-<!-- ## Advanced Usage: WARP Optimization
+<!-- ## Advanced Usage: Warp Optimization
 
-The workflow uses NVIDIA WARP to accelerate geometry optimization. The WARP kernel in `main_workflow.py` can be customized for more advanced force field calculations:
+The workflow uses NVIDIA Warp to accelerate geometry optimization. The Warp kernel in `main_workflow.py` can be customized for more advanced force field calculations:
 
 ```python
 @wp.kernel
@@ -166,7 +165,7 @@ def _optimize_geometry(pos: wp.array(dtype=wp.vec3f),
 
 - Large molecules may take longer to process
 - Some calculation types may not be available in NIM API
-- WARP acceleration requires an NVIDIA GPU for best performance -->
+- Warp acceleration requires an NVIDIA GPU for best performance -->
 
 ## License
 
