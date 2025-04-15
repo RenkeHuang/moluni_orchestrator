@@ -1,0 +1,137 @@
+name: Scheduled Alchemi Results Check
+
+on:
+  # Temporarily disable the 30-minute automatic check by commenting it out
+  # schedule:
+  #   - cron: '*/30 * * * *'
+  
+  # Manual trigger
+  workflow_dispatch:
+
+jobs:
+  check-results:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install rdkit ase numpy duckdb requests
+          
+      - name: Download pending jobs info
+        continue-on-error: true
+        uses: actions/download-artifact@v3
+        with:
+          name: pending-jobs
+          path: results/
+          
+      - name: Download existing database
+        continue-on-error: true
+        uses: actions/download-artifact@v3
+        with:
+          name: materials-db
+          path: ./
+      
+      - name: Check if there are pending jobs
+        id: check-pending
+        run: |
+          if [ -f "results/pending_jobs.json" ]; then
+            PENDING_COUNT=$(python -c "import json; f=open('results/pending_jobs.json'); data=json.load(f); f.close(); print(len(data))")
+            echo "PENDING_COUNT=$PENDING_COUNT" >> $GITHUB_ENV
+            if [ "$PENDING_COUNT" -gt "0" ]; then
+              echo "HAS_PENDING=true" >> $GITHUB_ENV
+            else
+              echo "HAS_PENDING=false" >> $GITHUB_ENV
+            fi
+          else
+            echo "HAS_PENDING=false" >> $GITHUB_ENV
+            echo "PENDING_COUNT=0" >> $GITHUB_ENV
+          fi
+          
+      - name: Check for new results
+        if: env.HAS_PENDING == 'true'
+        env:
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: |
+          python workflow/process_results.py
+          
+      - name: Generate results summary
+        if: env.HAS_PENDING == 'true'
+        run: |
+          echo "## Alchemi Results Update" > summary.md
+          echo "Checking on $PENDING_COUNT pending calculations" >> summary.md
+          
+          python -c "
+          import duckdb
+          import json
+          
+          # Get pending jobs before and after
+          try:
+              with open('results/pending_jobs.json', 'r') as f:
+                  current_pending = len(json.load(f))
+          except:
+              current_pending = 0
+          
+          with open('summary.md', 'a') as f:
+              f.write(f'\n\n### Results Status\n')
+              
+              if not current_pending:
+                  f.write('All calculations complete!\n')
+              else:
+                  f.write(f'Remaining pending jobs: {current_pending}\n')
+          
+          # Database statistics
+          try:
+              conn = duckdb.connect('data.duckdb')
+              total = conn.execute('SELECT COUNT(*) FROM calculations').fetchone()[0]
+              completed = conn.execute('SELECT COUNT(*) FROM calculations WHERE status = \"COMPLETED\"').fetchone()[0]
+              failed = conn.execute('SELECT COUNT(*) FROM calculations WHERE status IN (\"FAILED\", \"ERROR\")').fetchone()[0]
+              
+              with open('summary.md', 'a') as f:
+                  f.write(f'\n### Database Statistics\n')
+                  f.write(f'- Total calculations: {total}\n')
+                  f.write(f'- Completed: {completed}\n')
+                  f.write(f'- Failed: {failed}\n')
+                  
+                  if completed > 0:
+                      f.write(f'\n### Recent Completed Calculations\n')
+                      results = conn.execute('SELECT id, formula, calculation_type, completion_time FROM calculations WHERE status = \"COMPLETED\" ORDER BY completion_time DESC LIMIT 5').fetchall()
+                      
+                      f.write('| Job ID | Formula | Type | Completion Time |\n')
+                      f.write('|--------|---------|------|----------------|\n')
+                      for row in results:
+                          f.write(f'| {row[0]} | {row[1]} | {row[2]} | {row[3]} |\n')
+          except Exception as e:
+              with open('summary.md', 'a') as f:
+                  f.write(f'\nNo database statistics available yet.\n')
+          " 
+          
+          cat summary.md
+          
+      - name: Upload updated database
+        if: env.HAS_PENDING == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: materials-db
+          path: data.duckdb
+          
+      - name: Upload new results
+        if: env.HAS_PENDING == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: calculation-results
+          path: results/*.json
+
+      - name: Create or update summary issue
+        if: env.HAS_PENDING == 'true'
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          issue-number: ${{ github.event.issue.number }}
+          body-file: summary.md
