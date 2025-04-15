@@ -1,0 +1,4 @@
+B(F)(F)N(B(F)(F))B(F)(F)
+B(F)(F)N(B(F)(F))B(=O)
+B(F)(F)N(B(=O))B(=O)
+B(=O)N(B(=O))B(=O)
