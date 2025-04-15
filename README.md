@@ -43,8 +43,7 @@ moluni_orchestrator/
 │   ├── constants.py
 │   ├── postprocess.py      # Utils to check job status, process results
 │   └── workflow.py         # Preprocessing and prepare workflow
-├── README.md
-├── results              
+├── README.md             
 └── workflow
     ├── analyze_db.py
     ├── check_results.sh         # Bash script to check for results locally
